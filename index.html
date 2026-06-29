@@ -465,6 +465,48 @@
     .file-title { font-weight: 950; }
     .file-meta { margin-top: 4px; color: var(--text-muted); font-size: 12px; line-height: 1.45; }
     .library-actions { display: flex; gap: 7px; justify-content: flex-end; flex-wrap: wrap; }
+    .minutes-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 1100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 28px;
+      background: rgba(15,23,42,.55);
+      backdrop-filter: blur(8px);
+    }
+    .minutes-overlay.show { display: flex; }
+    .minutes-modal {
+      width: min(860px, 96vw);
+      max-height: 88vh;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .minutes-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 20px 22px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel-alt);
+    }
+    .minutes-title { font-size: 20px; font-weight: 950; line-height: 1.35; }
+    .minutes-meta { margin-top: 7px; color: var(--text-muted); font-size: 13px; line-height: 1.5; }
+    .minutes-body {
+      padding: 22px;
+      overflow: auto;
+      white-space: pre-wrap;
+      line-height: 1.65;
+      font-size: 14px;
+    }
+    .minutes-close { flex: 0 0 auto; }
     .empty { text-align: center; color: var(--text-muted); padding: 26px !important; }
     .saved-msg { color: var(--success); font-size: 13px; font-weight: 900; opacity: 0; transition: .18s; }
     .saved-msg.show { opacity: 1; }
@@ -498,6 +540,18 @@
     <div class="login-actions">
       <button class="btn-primary" onclick="loginUser()">시스템 접속</button>
     </div>
+  </div>
+</div>
+<div class="minutes-overlay no-print" id="minutesOverlay" onclick="if(event.target === this) closeMinutesModal();">
+  <div class="minutes-modal">
+    <div class="minutes-head">
+      <div>
+        <div class="minutes-title" id="minutesModalTitle"></div>
+        <div class="minutes-meta" id="minutesModalMeta"></div>
+      </div>
+      <button class="btn-soft minutes-close" onclick="closeMinutesModal()">닫기</button>
+    </div>
+    <div class="minutes-body" id="minutesModalContent"></div>
   </div>
 </div>
 <div class="shell">
@@ -1386,6 +1440,7 @@ function buildLibraryPanel(scope) {
                 <td class="no-print">
                   <div class="library-actions">
                     <button class="btn-soft btn-small" onclick="viewLibraryPost('${scope}','${file.id}')">보기</button>
+                    <button class="btn-soft btn-small" onclick="downloadLibraryPost('${scope}','${file.id}')">다운로드</button>
                     <button class="btn-soft btn-small" onclick="editLibraryPost('${scope}','${file.id}')">수정</button>
                     <button class="btn-danger btn-small" onclick="deleteLibraryPost('${scope}','${file.id}')">삭제</button>
                   </div>
@@ -1789,7 +1844,88 @@ function saveLibraryPost(scope) {
 function viewLibraryPost(scope, id) {
   const file = getLibrary(scope).find(item => item.id === id);
   if (!file) return;
-  alert(`[${file.category}] ${file.title}\n회의일: ${file.meetingDate}\n\n${file.content}`);
+  openMinutesModal(file);
+}
+
+function openMinutesModal(file) {
+  const overlay = document.getElementById('minutesOverlay');
+  const titleEl = document.getElementById('minutesModalTitle');
+  const metaEl = document.getElementById('minutesModalMeta');
+  const contentEl = document.getElementById('minutesModalContent');
+  if (!overlay || !titleEl || !metaEl || !contentEl) return;
+  titleEl.textContent = file.title || '회의록';
+  metaEl.textContent = `${file.category || '-'} · 회의일 ${file.meetingDate || '-'} · 등록 ${file.createdAt || '-'}`;
+  contentEl.textContent = file.content || '';
+  overlay.classList.add('show');
+}
+
+function closeMinutesModal() {
+  const overlay = document.getElementById('minutesOverlay');
+  if (overlay) overlay.classList.remove('show');
+}
+
+function buildMinutesText(file) {
+  return [
+    `[${file.category || '-'}] ${file.title || '회의록'}`,
+    `회의일: ${file.meetingDate || '-'}`,
+    `등록일: ${file.createdAt || '-'}`,
+    '',
+    file.content || ''
+  ].join('\n');
+}
+
+function buildMinutesWordHtml(file) {
+  const title = escapeHtml(file.title || '회의록');
+  const category = escapeHtml(file.category || '-');
+  const meetingDate = escapeHtml(file.meetingDate || '-');
+  const createdAt = escapeHtml(file.createdAt || '-');
+  const content = escapeHtml(file.content || '').replace(/\n/g, '<br>');
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>${title}</title>
+  <style>
+    body { font-family: "Malgun Gothic", Arial, sans-serif; color: #111827; line-height: 1.65; }
+    h1 { font-size: 22pt; margin: 0 0 14pt; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 18pt; }
+    th, td { border: 1px solid #cbd5e1; padding: 8pt; text-align: left; vertical-align: top; }
+    th { width: 90pt; background: #f1f5f9; }
+    .content { font-size: 11pt; white-space: normal; }
+  </style>
+</head>
+<body>
+  <h1>${title}</h1>
+  <table>
+    <tr><th>구분</th><td>${category}</td></tr>
+    <tr><th>회의일</th><td>${meetingDate}</td></tr>
+    <tr><th>등록일</th><td>${createdAt}</td></tr>
+  </table>
+  <div class="content">${content}</div>
+</body>
+</html>`;
+}
+
+function safeFileName(value) {
+  return String(value || '회의록')
+    .replace(/[\\/:*?"<>|]+/g, '_')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 80) || '회의록';
+}
+
+function downloadLibraryPost(scope, id) {
+  const file = getLibrary(scope).find(item => item.id === id);
+  if (!file) return;
+  const blob = new Blob([buildMinutesWordHtml(file)], { type: 'application/msword;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${safeFileName(file.meetingDate ? `${file.meetingDate}_${file.title}` : file.title)}.doc`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 function editLibraryPost(scope, id) {
@@ -1959,6 +2095,10 @@ window.addEventListener('DOMContentLoaded', async () => {
   await loadFromSupabase();
   restoreLogin();
   renderAll();
+});
+
+window.addEventListener('keydown', event => {
+  if (event.key === 'Escape') closeMinutesModal();
 });
 </script>
 </body>
