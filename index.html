@@ -1,0 +1,1965 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bulk Up Project Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --panel: #ffffff;
+      --panel-alt: #f8fafc;
+      --text: #101828;
+      --text-soft: #475467;
+      --text-muted: #667085;
+      --line: #d8dee9;
+      --brand: #12365a;
+      --brand-2: #1d4ed8;
+      --accent: #8b1e2d;
+      --success: #0f9f6e;
+      --warning: #d97706;
+      --danger: #dc2626;
+      --hold: #6b7280;
+      --shadow: 0 12px 28px rgba(16,24,40,.09);
+      --radius: 14px;
+      --header-h: 70px;
+    }
+
+    body.dark {
+      --bg: #0b1220;
+      --panel: #111a2d;
+      --panel-alt: #152035;
+      --text: #edf2f7;
+      --text-soft: #d0d8e6;
+      --text-muted: #94a3b8;
+      --line: #263245;
+      --brand: #4a90d9;
+      --brand-2: #60a5fa;
+      --accent: #d9485f;
+      --success: #22c55e;
+      --shadow: 0 16px 34px rgba(0,0,0,.34);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Pretendard", "Malgun Gothic", "Apple SD Gothic Neo", Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button, input, select, textarea { font: inherit; min-width: 0; }
+    button {
+      cursor: pointer;
+      border: 0;
+      border-radius: 10px;
+      padding: 9px 14px;
+      font-weight: 800;
+      transition: .16s ease;
+      max-width: 100%;
+      white-space: normal;
+    }
+    button:hover { transform: translateY(-1px); }
+    input, select, textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--text);
+      border-radius: 9px;
+      padding: 9px 11px;
+      outline: none;
+    }
+    textarea { min-height: 86px; resize: vertical; line-height: 1.55; }
+    .shell, .main-wrap, .main-scroll, .page, .card, .portfolio-item, .org-card, .org-member, td, th, div, p, span {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      word-break: keep-all;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--brand-2); box-shadow: 0 0 0 3px rgba(29,78,216,.11); }
+
+    .btn-primary { background: var(--brand); color: #fff; }
+    .btn-accent { background: var(--accent); color: #fff; }
+    .btn-soft { background: var(--panel-alt); color: var(--text-soft); border: 1px solid var(--line); }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-small { padding: 6px 10px; font-size: 12px; border-radius: 8px; }
+
+    .login-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(15,23,42,.58);
+      backdrop-filter: blur(8px);
+    }
+    .login-overlay.show { display: flex; }
+    .login-box {
+      width: min(440px, 100%);
+      padding: 28px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+    .login-box h2 { margin: 0 0 8px; font-size: 25px; line-height: 1.25; }
+    .login-box p { margin: 0 0 18px; color: var(--text-muted); line-height: 1.55; }
+    .login-actions { display: flex; gap: 10px; margin-top: 12px; }
+    .user-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 38px;
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--panel-alt);
+      color: var(--text-soft);
+      font-size: 13px;
+      font-weight: 850;
+    }
+    .user-chip button { padding: 0; color: var(--text-muted); background: transparent; font-size: 12px; }
+
+    .shell { min-height: 100vh; display: flex; }
+    .sidebar {
+      width: 300px;
+      flex: 0 0 300px;
+      background: linear-gradient(180deg, #111827 0%, #17243a 100%);
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 8px 0 24px rgba(15,23,42,.18);
+    }
+    .sb-top { padding: 28px 24px 20px; border-bottom: 1px solid rgba(255,255,255,.08); }
+    .sb-logo { font-size: 12px; font-weight: 900; color: rgba(255,255,255,.68); letter-spacing: .06em; }
+    .sb-project { margin-top: 12px; font-size: 27px; font-weight: 950; line-height: 1.12; }
+    .sb-nav { flex: 1; overflow: auto; padding: 16px; }
+    .sb-tab {
+      width: 100%;
+      display: block;
+      text-align: left;
+      margin-bottom: 10px;
+      padding: 14px;
+      background: rgba(255,255,255,.06);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 12px;
+    }
+    .sb-tab.active, .sb-tab:hover { background: rgba(255,255,255,.14); }
+    .sb-tab-row { display: flex; align-items: stretch; gap: 8px; margin-bottom: 10px; }
+    .sb-tab-row .sb-tab { flex: 1; margin-bottom: 0; }
+    .sb-tab-delete {
+      flex: 0 0 auto;
+      padding: 8px 10px;
+      background: rgba(220,38,38,.92);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,.16);
+      font-size: 12px;
+      font-weight: 900;
+    }
+    .sb-tab-delete:hover { background: #ef4444; }
+    .sb-tab-main { display: block; font-size: 15px; font-weight: 900; line-height: 1.35; }
+    .sb-tab-sub { display: block; color: rgba(255,255,255,.7); font-size: 12px; line-height: 1.45; margin-top: 7px; word-break: keep-all; }
+    .sb-bottom { padding: 16px; border-top: 1px solid rgba(255,255,255,.08); }
+    .sb-create-btn {
+      width: 100%;
+      min-height: 46px;
+      border-radius: 10px;
+      background: #8b1e2d;
+      color: #fff;
+      border: 1px solid rgba(255,255,255,.14);
+      font-size: 15px;
+      font-weight: 950;
+      box-shadow: 0 8px 18px rgba(139,30,45,.28);
+    }
+    .sb-create-btn:hover { background: #a82336; color: #fff; }
+
+    .main-wrap { flex: 1; min-width: 0; display: flex; flex-direction: column; height: 100vh; }
+    .header {
+      height: var(--header-h);
+      flex: 0 0 var(--header-h);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 0 26px;
+      background: var(--brand);
+      color: #fff;
+      box-shadow: 0 4px 18px rgba(0,0,0,.18);
+    }
+    .header-left { display: flex; align-items: center; gap: 16px; min-width: 0; }
+    .header-eyebrow { font-size: 11px; font-weight: 900; color: rgba(255,255,255,.63); letter-spacing: .08em; }
+    .header-title { font-size: 22px; font-weight: 950; line-height: 1.2; }
+    .header-badge { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border-radius: 999px; background: rgba(255,255,255,.13); font-size: 12px; font-weight: 900; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; }
+    .date-range { color: rgba(255,255,255,.76); font-size: 13px; font-weight: 800; }
+    .project-deadline-editor { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 9px; }
+    .project-deadline-editor label { color: var(--text-muted); font-size: 12px; font-weight: 900; }
+    .project-deadline-editor input { width: auto; min-width: 160px; }
+    .header-right { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+    .hbtn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      min-height: 42px;
+      padding: 10px 16px;
+      border-radius: 11px;
+      background: #f8fafc;
+      color: #111827;
+      border: 1px solid #d5deea;
+      box-shadow: 0 1px 2px rgba(15,23,42,.04);
+      font-size: 14px;
+      font-weight: 900;
+    }
+    .hbtn:hover { background: #fff; border-color: #c7d2e2; }
+    .hbtn-save { background: #0f9f6e; color: #fff; border-color: #0f9f6e; }
+    .hbtn-save:hover { background: #0b8d61; border-color: #0b8d61; }
+    .hbtn-edit { background: #fff; color: #8b1e2d; border-color: #8b1e2d; }
+    .hbtn-edit.active { background: #8b1e2d; color: #fff; }
+
+    .main-scroll { flex: 1; overflow: auto; }
+    .page { max-width: 1460px; margin: 0 auto; padding: 26px 28px 56px; }
+    .view { display: none; }
+    .view.active { display: block; }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .card-pad { padding: 18px 20px; }
+    .section-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin: 22px 0 13px; }
+    .section-title { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 950; }
+    .sec-num { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 8px; background: var(--brand); color: #fff; font-size: 14px; }
+    .subtle { color: var(--text-muted); font-size: 13px; }
+
+    .kpi-strip { display: grid; grid-template-columns: repeat(4, minmax(170px, 1fr)); gap: 14px; }
+    .kpi-card {
+      position: relative;
+      overflow: hidden;
+      padding: 18px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .kpi-card::before { content: ""; position: absolute; inset: 0 0 auto; height: 4px; background: var(--kpi, var(--brand)); }
+    .kpi-label { color: var(--text-muted); font-size: 12px; font-weight: 900; letter-spacing: .04em; text-transform: uppercase; }
+    .kpi-value { margin-top: 8px; font-size: 31px; font-weight: 950; line-height: 1; }
+    .kpi-sub { margin-top: 8px; color: var(--text-muted); font-size: 12px; }
+
+    .overview-grid { display: grid; grid-template-columns: 1.35fr .9fr; gap: 16px; }
+    .meta-table { width: 100%; border-collapse: collapse; }
+    .meta-table td { padding: 10px 0; border-bottom: 1px solid var(--line); vertical-align: top; font-size: 14px; line-height: 1.55; }
+    .meta-table tr:last-child td { border-bottom: 0; }
+    .meta-table td:first-child { width: 130px; color: var(--text-muted); font-weight: 900; }
+    .activity-list { display: grid; gap: 10px; }
+    .activity-item { display: grid; grid-template-columns: 32px 1fr; gap: 10px; align-items: start; padding: 12px; border: 1px solid var(--line); border-radius: 11px; background: var(--panel-alt); }
+    .activity-n { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: var(--brand); color: #fff; font-size: 13px; font-weight: 950; }
+    .activity-text { font-size: 14px; font-weight: 750; line-height: 1.5; }
+
+    .portfolio-list { display: flex; flex-direction: column; gap: 12px; }
+    .portfolio-item {
+      display: grid;
+      grid-template-columns: minmax(0, 3fr) 90px minmax(0, 1.5fr) 72px;
+      gap: 14px;
+      align-items: center;
+      padding: 16px 18px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      box-shadow: 0 4px 14px rgba(16,24,40,.04);
+      cursor: pointer;
+    }
+    .portfolio-item:hover { border-color: var(--brand-2); }
+    .portfolio-title { font-size: 16px; font-weight: 950; line-height: 1.35; overflow-wrap: anywhere; word-break: keep-all; }
+    .portfolio-meta { margin-top: 6px; color: var(--text-muted); font-size: 12px; line-height: 1.55; }
+    .portfolio-count { font-size: 14px; font-weight: 950; text-align: center; }
+    .progress-wrap { display: flex; align-items: center; gap: 10px; }
+    .track { flex: 1; height: 9px; background: #eaf0f7; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+    body.dark .track { background: #1e293b; }
+    .fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #60a5fa, #1d4ed8); }
+    .pct { min-width: 42px; text-align: right; font-size: 13px; font-weight: 950; }
+    .pill { display: inline-flex; align-items: center; justify-content: center; min-height: 26px; padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 900; }
+    .pill.normal { background: rgba(15,159,110,.12); color: var(--success); }
+    .pill.wip { background: rgba(29,78,216,.12); color: var(--brand-2); }
+    .pill.done { background: rgba(17,24,39,.12); color: var(--text); }
+    .pill.hold { background: rgba(107,114,128,.14); color: var(--hold); }
+
+    .chart-grid { display: grid; grid-template-columns: minmax(260px, .9fr) minmax(420px, 1.5fr); gap: 16px; }
+    .chart-container { height: 260px; position: relative; }
+    .donut-css {
+      width: min(210px, 72%);
+      aspect-ratio: 1;
+      margin: 14px auto 10px;
+      border-radius: 50%;
+      background: conic-gradient(var(--accent) calc(var(--pct) * 1%), #d8dee9 0);
+      position: relative;
+      display: grid;
+      place-items: center;
+    }
+    body.dark .donut-css { background: conic-gradient(var(--accent) calc(var(--pct) * 1%), #263245 0); }
+    .donut-css::after {
+      content: "";
+      position: absolute;
+      width: 68%;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background: var(--panel);
+    }
+    .donut-label { position: relative; z-index: 1; text-align: center; }
+    .donut-label strong { display: block; font-size: 30px; line-height: 1; }
+    .donut-label span { display: block; margin-top: 6px; color: var(--text-muted); font-size: 12px; font-weight: 900; }
+    .comparison-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .comparison-table th, .comparison-table td { padding: 11px 10px; border-bottom: 1px solid var(--line); font-size: 13px; text-align: left; }
+    .comparison-table th { color: var(--text-muted); font-weight: 950; background: var(--panel-alt); }
+    .comparison-table tr:last-child td { border-bottom: 0; }
+
+    .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+    .tab { background: var(--panel-alt); color: var(--text-soft); border: 1px solid var(--line); border-radius: 999px; }
+    .tab.active { background: var(--brand); color: #fff; border-color: var(--brand); }
+
+    .timeline-wrap { overflow-x: auto; padding-bottom: 8px; }
+    .timeline-table { width: 100%; min-width: 820px; border-collapse: collapse; table-layout: fixed; }
+    .timeline-table th, .timeline-table td { border: 1px solid var(--line); padding: 7px; font-size: 12px; text-align: center; }
+    .timeline-table th { background: var(--panel-alt); color: var(--text-muted); font-weight: 950; }
+    .tl-label { min-width: 230px; text-align: left !important; font-weight: 850; color: var(--text); overflow-wrap: anywhere; word-break: keep-all; }
+    .tl-cell { min-width: 48px; height: 30px; }
+    .tl-bar { height: 14px; border-radius: 999px; }
+    .tl-c1 { background: #1d4ed8; }
+    .tl-c2 { background: #0f9f6e; }
+    .tl-c3 { background: #8b1e2d; }
+
+    .org-wrap { padding: 20px; border-radius: 12px; }
+    .org-headline { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+    .org-headline h3 { margin: 0; font-size: 18px; font-weight: 950; color: var(--text); }
+    .org-grid {
+      display: grid;
+      grid-template-columns: minmax(220px, .9fr) minmax(220px, .9fr) minmax(280px, 1fr);
+      gap: 16px;
+      align-items: start;
+    }
+    .org-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+    .org-card {
+      min-height: 112px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: linear-gradient(180deg, var(--panel), var(--panel-alt));
+      padding: 16px;
+    }
+    .org-card-label {
+      display: block;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 950;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    .org-name { font-size: 18px; font-weight: 950; line-height: 1.35; color: var(--text); }
+    .org-role { margin-top: 5px; color: var(--text-muted); font-size: 13px; font-weight: 750; }
+    .org-member-list {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: linear-gradient(180deg, var(--panel), var(--panel-alt));
+      padding: 14px;
+    }
+    .org-member-head { color: var(--text-muted); font-size: 12px; font-weight: 950; margin-bottom: 10px; }
+    .org-member {
+      padding: 11px 12px;
+      border: 1px dashed var(--line-strong);
+      border-radius: 12px;
+      margin-bottom: 10px;
+      background: rgba(255,255,255,.35);
+    }
+    body.dark .org-member { background: rgba(255,255,255,.04); }
+    .org-member:last-child { margin-bottom: 0; }
+    .org-member-name { font-weight: 900; line-height: 1.35; }
+    .org-member-role { margin-top: 3px; color: var(--text-muted); font-size: 12px; }
+    .org-edit-input { margin-top: 3px; font-size: 16px; font-weight: 900; }
+    .org-edit-role { margin-top: 8px; font-size: 13px; color: var(--text-soft); }
+    .org-member-edit-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) auto;
+      gap: 8px;
+      align-items: center;
+    }
+    .org-member-edit-grid input { padding: 8px 9px; font-size: 13px; }
+    @media (max-width: 620px) {
+      .org-member-edit-grid { grid-template-columns: 1fr; }
+      .org-member-edit-grid .btn-danger { width: 100%; }
+    }
+
+    .detail-grid { display: grid; grid-template-columns: minmax(360px, 1fr) minmax(420px, 1.3fr); gap: 16px; }
+    .detail-hero { border-radius: var(--radius); overflow: hidden; border: 1px solid var(--line); box-shadow: var(--shadow); margin-bottom: 18px; }
+    .detail-head { padding: 22px 24px; color: #fff; background: linear-gradient(135deg, var(--brand), var(--brand-2)); }
+    .detail-label { font-size: 11px; font-weight: 950; color: rgba(255,255,255,.68); letter-spacing: .08em; }
+    .detail-title { margin-top: 7px; font-size: 21px; font-weight: 950; line-height: 1.35; overflow-wrap: anywhere; word-break: keep-all; }
+    .detail-title-input {
+      margin-top: 8px;
+      border-color: rgba(255,255,255,.34);
+      background: rgba(255,255,255,.12);
+      color: #fff;
+      font-size: 20px;
+      font-weight: 900;
+    }
+    .detail-body { padding: 18px 22px; background: var(--panel); }
+    .field-grid { display: grid; grid-template-columns: repeat(2, minmax(160px, 1fr)); gap: 10px; }
+    .field-grid label, .library-toolbar label, .task-editor label { display: block; color: var(--text-muted); font-size: 12px; font-weight: 900; margin-bottom: 6px; }
+    .task-list { display: flex; flex-direction: column; gap: 9px; }
+    .task-item {
+      display: grid;
+      grid-template-columns: 28px 1fr auto auto;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 12px;
+      background: var(--panel-alt);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+    }
+    .task-chk { display: grid; place-items: center; width: 25px; height: 25px; border-radius: 7px; border: 2px solid #b9c5d4; font-size: 13px; font-weight: 950; }
+    .task-item[data-status="wip"] .task-chk { background: var(--brand-2); border-color: var(--brand-2); color: #fff; }
+    .task-item[data-status="done"] .task-chk { background: var(--success); border-color: var(--success); color: #fff; }
+    .task-title { font-size: 14px; font-weight: 850; line-height: 1.45; overflow-wrap: anywhere; word-break: keep-all; }
+    .task-meta { margin-top: 4px; color: var(--text-muted); font-size: 12px; line-height: 1.5; }
+    .task-editor { display: grid; grid-template-columns: 1.4fr .8fr .8fr .65fr auto; gap: 10px; align-items: end; margin-top: 13px; padding-top: 13px; border-top: 1px solid var(--line); }
+    .wbs-table { width: 100%; border-collapse: collapse; min-width: 1420px; table-layout: fixed; }
+    .wbs-table th, .wbs-table td { padding: 10px 9px; border-bottom: 1px solid var(--line); vertical-align: top; font-size: 13px; }
+    .wbs-table th { background: var(--panel-alt); color: var(--text-muted); text-align: left; font-weight: 950; }
+    .wbs-table tr.lv1 td { background: rgba(29,78,216,.045); font-weight: 850; }
+    .wbs-name { width: 230px; }
+    .wbs-text { white-space: normal; overflow-wrap: anywhere; word-break: keep-all; }
+    .wbs-small { width: 110px; }
+    .wbs-date { width: 124px; }
+    .wbs-progress { width: 86px; }
+    .wbs-status { width: 105px; }
+    .wbs-attach { width: 150px; }
+    .wbs-actions { width: 132px; }
+    .wbs-table input, .wbs-table select, .wbs-table textarea { width: 100%; }
+    .wbs-table textarea { min-height: 44px; }
+    .wbs-table .library-actions { justify-content: flex-start; }
+    .task-file-name { display: block; max-width: 100%; font-size: 12px; font-weight: 850; color: var(--brand); overflow-wrap: anywhere; word-break: break-all; }
+    .task-file-meta { margin-top: 3px; color: var(--text-muted); font-size: 11px; line-height: 1.35; }
+    .task-file-input { margin-top: 6px; font-size: 11px; }
+    .link-btn { border: 0; padding: 0; background: transparent; text-align: left; cursor: pointer; }
+    .indent-1 { padding-left: 8px !important; }
+    .indent-2 { padding-left: 28px !important; }
+    .indent-3 { padding-left: 48px !important; }
+    .indent-4 { padding-left: 68px !important; }
+    .nowrap-cell { white-space: nowrap; }
+    .edit-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+    .edit-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
+    .library-toolbar { display: grid; grid-template-columns: 140px 160px minmax(180px, 1fr) auto; gap: 10px; align-items: end; margin-bottom: 10px; }
+    .library-content { min-height: 160px; }
+    .library-table { width: 100%; border-collapse: collapse; min-width: 760px; }
+    .library-table th, .library-table td { padding: 11px 10px; border-bottom: 1px solid var(--line); vertical-align: top; font-size: 13px; }
+    .library-table th { color: var(--text-muted); background: var(--panel-alt); text-align: left; font-weight: 950; }
+    .file-title { font-weight: 950; }
+    .file-meta { margin-top: 4px; color: var(--text-muted); font-size: 12px; line-height: 1.45; }
+    .library-actions { display: flex; gap: 7px; justify-content: flex-end; flex-wrap: wrap; }
+    .empty { text-align: center; color: var(--text-muted); padding: 26px !important; }
+    .saved-msg { color: var(--success); font-size: 13px; font-weight: 900; opacity: 0; transition: .18s; }
+    .saved-msg.show { opacity: 1; }
+
+    @media (max-width: 1180px) {
+      .shell { display: block; }
+      .sidebar { width: 100%; flex: auto; }
+      .sb-nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .main-wrap { height: auto; min-height: 100vh; }
+      .header { height: auto; flex-wrap: wrap; padding: 16px; }
+      .kpi-strip, .overview-grid, .chart-grid, .detail-grid, .org-grid { grid-template-columns: 1fr; }
+      .portfolio-item { grid-template-columns: 1fr; }
+      .task-editor, .library-toolbar { grid-template-columns: 1fr; }
+    }
+
+    @media print {
+      .sidebar, .header-right, .no-print { display: none !important; }
+      .shell { display: block; }
+      .main-wrap { height: auto; }
+      .main-scroll { overflow: visible; }
+      body { background: #fff; }
+    }
+  </style>
+</head>
+<body>
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-box">
+    <h2>Bulk Up TF 접속</h2>
+    <p>조직도 등록 인원과 오승희만 접속 및 수정할 수 있습니다.</p>
+    <input id="loginName" type="text" placeholder="이름 입력" onkeydown="if(event.key==='Enter') loginUser();" />
+    <div class="login-actions">
+      <button class="btn-primary" onclick="loginUser()">시스템 접속</button>
+    </div>
+  </div>
+</div>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="sb-top">
+      <div class="sb-logo">대한사료 · Bulk Up TF</div>
+      <div class="sb-project">Bulk Up<br>Project</div>
+    </div>
+    <nav class="sb-nav" id="sideNav"></nav>
+    <div class="sb-bottom">
+      <button class="sb-create-btn" onclick="addIssue()">신규 핵심과제 생성</button>
+    </div>
+  </aside>
+
+  <div class="main-wrap">
+    <header class="header">
+      <div class="header-left">
+        <div>
+          <div class="header-eyebrow">대한사료 · Bulk Up TF</div>
+          <div class="header-title">Bulk Up Project Dashboard</div>
+        </div>
+        <div class="header-badge"><span class="dot"></span>진행 중</div>
+        <div class="date-range" id="headerDateRange">2026.06.29 ~ 2026.08.31</div>
+      </div>
+      <div class="header-right">
+        <div class="user-chip" id="userChip" style="display:none;">
+          <span id="currentUserName"></span>
+          <button type="button" onclick="logoutUser()">로그아웃</button>
+        </div>
+        <button class="hbtn" onclick="toggleTheme()">🌙/☀️ 테마 전환</button>
+        <button class="hbtn" onclick="openSettings()">⚙️ 설정</button>
+        <button class="hbtn hbtn-save" onclick="saveAll()">💾 저장</button>
+        <button id="topEditBtn" class="hbtn hbtn-edit" onclick="toggleEditMode()">편집 모드 켜기</button>
+        <button class="hbtn" onclick="downloadPdf()">PDF 다운</button>
+      </div>
+    </header>
+
+    <main class="main-scroll">
+      <section class="view active" id="view-summary"></section>
+      <section class="view" id="view-issue1"></section>
+      <section class="view" id="view-issue2"></section>
+      <section class="view" id="view-issue3"></section>
+    </main>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'bulkup_dash_v2';
+const AUTH_STORAGE_KEY = 'bulkup_dash_user';
+const EXTRA_ALLOWED_USERS = ['오승희'];
+const SUPABASE_URL = 'https://kzyptpjeseosrlzfhzdo.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_Yo6nTjXw__3NM2uHc8p9pg_O_18tZoB';
+const APP_STATE_ID = 'bulk_up_dashboard';
+const TASK_ATTACHMENT_ACCEPT = '.doc,.docx,.hwp,.hwpx,.xls,.xlsx,.ppt,.pptx';
+const TASK_ATTACHMENT_EXTS = ['doc', 'docx', 'hwp', 'hwpx', 'xls', 'xlsx', 'ppt', 'pptx'];
+const TASK_ATTACHMENT_MAX_SIZE = 8 * 1024 * 1024;
+const STATUS_LABELS = { none: '대기', wip: '진행중', done: '완료', hold: '보류' };
+const STATUS_ICONS = { none: '', wip: '…', done: '✓', hold: '!' };
+const STATUS_CLASS = { none: 'hold', wip: 'wip', done: 'done', hold: 'hold' };
+let activeTab = 'summary';
+let donutChart = null;
+let editMode = false;
+let currentUser = null;
+let supabaseClient = null;
+let supabaseEnabled = false;
+let lastSupabaseSaveAt = 0;
+
+const defaultData = {
+  theme: 'light',
+  project: {
+    name: 'Bulk Up Project',
+    period: '2026.06.29 ~ 2026.08.31',
+    startDate: '2026-06-29',
+    endDate: '2026-08-31',
+    goal: '공장 생산 효율과 Capa UP, Ton Bag에서 벌크 물류 효율 UP을 통해 114Project 목표달성 기반 마련',
+    backgroundFactory: '인천공장 벌크빈 수량 및 창고 부족으로 Ton Bag 중심 생산과 보관 효율 저하가 발생',
+    backgroundLogistics: 'Ton Bag 포장, 상하차 인원, 물류비 증가와 벌크차 운행 비효율이 누적'
+  },
+  org: {
+    manager: '김신 팀장',
+    managerRole: 'Project Manager',
+    sponsor: '김진영 상무',
+    sponsorRole: 'Project Sponsor',
+    teams: [
+      { id: 'org-member-1', role: '물류 박준철 팀장', name: '박준철' },
+      { id: 'org-member-2', role: '생산 최보근 팀장', name: '최보근' },
+      { id: 'org-member-3', role: '기획 김경일 대리', name: '김경일' }
+    ]
+  },
+  issues: [
+    {
+      id: 'issue1',
+      no: '01',
+      color: '#1d4ed8',
+      title: '공장 Ton Bag 포장을 벌크 직송으로 전환하기 위한 방안 도출',
+      sponsor: '김진영',
+      supporter: '최보근',
+      leader: '최보근',
+      tasks: [
+        { id: '1-1', name: 'Ton Bag → Bulk 전환을 위한 방안 검토', owner: '최보근', start: '', end: '', status: 'wip' },
+        { id: '1-2', name: 'Bulk 전환 시 생산 및 물류 대응안 마련', owner: '최보근', start: '', end: '', status: 'none' },
+        { id: '1-3', name: 'Bulk bin 규모 및 위치 확정', owner: '최보근', start: '', end: '', status: 'none' },
+        { id: '1-4', name: 'Bulk bin 건설 비용 산출', owner: '최보근', start: '', end: '', status: 'none' }
+      ],
+      library: []
+    },
+    {
+      id: 'issue2',
+      no: '02',
+      color: '#0f9f6e',
+      title: 'Bulk Station 건설 가능한 영업소 운영 모델 선정',
+      sponsor: '김진영',
+      supporter: '박준철',
+      leader: '박준철',
+      tasks: [
+        { id: '2-1', name: 'Bulk Station 설치 대상 영업소 선정', owner: '박준철', start: '', end: '', status: 'wip' },
+        { id: '2-2', name: '해당 영업소 Bulk Station 운영 모델 검토', owner: '박준철', start: '', end: '', status: 'none' },
+        { id: '2-3', name: 'Bulk Station 설치 후 비용 증감 내용 및 금액 산출', owner: '박준철', start: '', end: '', status: 'none' },
+        { id: '2-4', name: '공장지대 등 운송 대안 마련', owner: '박준철', start: '', end: '', status: 'none' }
+      ],
+      library: []
+    },
+    {
+      id: 'issue3',
+      no: '03',
+      color: '#8b1e2d',
+      title: 'Bulk bin & station 건설의 경제성 산출',
+      sponsor: '김진영',
+      supporter: '김경일',
+      leader: '김경일',
+      tasks: [
+        { id: '3-1', name: '인천공장 Bulk bin 설치 후 Capa 증가량 산출', owner: '김경일', start: '', end: '', status: 'wip' },
+        { id: '3-2', name: '인천공장 Bulk bin 설치 후 물류비 절감액 산출', owner: '김경일', start: '', end: '', status: 'none' },
+        { id: '3-3', name: 'Bulk Station 설치 후 물류비 절감에 따른 경제성 산출', owner: '김경일', start: '', end: '', status: 'none' },
+        { id: '3-4', name: '투자 회수기간 산출', owner: '김경일', start: '', end: '', status: 'none' }
+      ],
+      library: []
+    }
+  ],
+  library: []
+};
+
+let data = clone(defaultData);
+
+function clone(obj) {
+  return JSON.parse(JSON.stringify(obj));
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
+function escapeAttr(value) {
+  return escapeHtml(value).replace(/`/g, '&#96;');
+}
+
+function todayStr() {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function parseTaskDate(value) {
+  if (!value) return null;
+  const d = new Date(`${value}T00:00:00`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function issueById(id) {
+  return data.issues.find(issue => issue.id === id);
+}
+
+function cleanPersonName(value) {
+  return String(value || '')
+    .replace(/\b(Project|Manager|Sponsor|Supporter|Team|leader)\b/gi, ' ')
+    .replace(/팀장|상무|대리|과장|차장|부장|님/g, ' ')
+    .replace(/[·,/|]+/g, ' ')
+    .trim()
+    .split(/\s+/)[0] || '';
+}
+
+function getAllowedUsers() {
+  ensureOrgData();
+  const names = [
+    cleanPersonName(data.org.sponsor),
+    cleanPersonName(data.org.manager),
+    ...(data.org.teams || []).map(member => cleanPersonName(member.name)),
+    ...EXTRA_ALLOWED_USERS
+  ].filter(Boolean);
+  return [...new Set(names)];
+}
+
+function isAllowedUser(name) {
+  const normalized = cleanPersonName(name);
+  return getAllowedUsers().includes(normalized);
+}
+
+function syncAuthUi() {
+  const overlay = document.getElementById('loginOverlay');
+  const chip = document.getElementById('userChip');
+  const nameEl = document.getElementById('currentUserName');
+  if (overlay) overlay.classList.toggle('show', !currentUser);
+  if (chip) chip.style.display = currentUser ? 'inline-flex' : 'none';
+  if (nameEl) nameEl.textContent = currentUser ? `${currentUser.name} 접속 중` : '';
+}
+
+function loginUser() {
+  const input = document.getElementById('loginName');
+  const name = cleanPersonName(input?.value || '');
+  if (!name) return alert('이름을 입력해 주세요.');
+  if (!isAllowedUser(name)) return alert('접속 권한이 없는 사용자입니다.');
+  currentUser = { name };
+  localStorage.setItem(AUTH_STORAGE_KEY, name);
+  syncAuthUi();
+  renderAll();
+  switchTab(activeTab);
+}
+
+function restoreLogin() {
+  const savedName = cleanPersonName(localStorage.getItem(AUTH_STORAGE_KEY) || '');
+  if (savedName && isAllowedUser(savedName)) currentUser = { name: savedName };
+  else localStorage.removeItem(AUTH_STORAGE_KEY);
+  syncAuthUi();
+}
+
+function logoutUser() {
+  currentUser = null;
+  editMode = false;
+  localStorage.removeItem(AUTH_STORAGE_KEY);
+  syncAuthUi();
+  renderAll();
+  switchTab(activeTab);
+}
+
+function requireEditPermission() {
+  if (!currentUser || !isAllowedUser(currentUser.name)) {
+    editMode = false;
+    syncAuthUi();
+    alert('조직도 등록 인원 또는 오승희만 수정할 수 있습니다.');
+    return false;
+  }
+  return true;
+}
+
+function calcIssue(issue) {
+  const leafTasks = issue.tasks.filter(task => !issue.tasks.some(child => child.parentId === task.id));
+  const base = leafTasks.length ? leafTasks : issue.tasks;
+  const total = base.length;
+  const done = base.filter(t => isTaskComplete(t)).length;
+  const wip = base.filter(t => t.status === 'wip').length;
+  const pct = total ? Math.round(done / total * 100) : 0;
+  return { total, done, wip, pct };
+}
+
+function isTaskComplete(task) {
+  return task.status === 'done' && String(task.output || '').trim().length > 0;
+}
+
+function calcOverall() {
+  const totals = data.issues.map(calcIssue);
+  const total = totals.reduce((sum, row) => sum + row.total, 0);
+  const done = totals.reduce((sum, row) => sum + row.done, 0);
+  const wip = totals.reduce((sum, row) => sum + row.wip, 0);
+  return { total, done, wip, pct: total ? Math.round(done / total * 100) : 0 };
+}
+
+function normalizeProjectDate(value) {
+  const match = String(value ?? '').trim().match(/^(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})$/);
+  if (!match) return '';
+  const normalized = `${match[1]}-${String(match[2]).padStart(2, '0')}-${String(match[3]).padStart(2, '0')}`;
+  const date = parseTaskDate(normalized);
+  if (!date || date.getFullYear() !== Number(match[1]) || date.getMonth() + 1 !== Number(match[2]) || date.getDate() !== Number(match[3])) return '';
+  return normalized;
+}
+
+function formatProjectDate(value) {
+  const date = parseTaskDate(value);
+  if (!date) return '';
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yyyy}.${mm}.${dd}`;
+}
+
+function getProjectPeriodText() {
+  const start = formatProjectDate(data.project?.startDate);
+  const end = formatProjectDate(data.project?.endDate);
+  if (start && end) return `${start} ~ ${end}`;
+  if (start) return `${start} ~`;
+  if (end) return `~ ${end}`;
+  return String(data.project?.period || '-');
+}
+
+function projectDurationDays() {
+  const start = parseTaskDate(data.project?.startDate);
+  const end = parseTaskDate(data.project?.endDate);
+  if (!start || !end || end < start) return 0;
+  return Math.floor((end - start) / 86400000) + 1;
+}
+
+function daysLeft() {
+  const end = parseTaskDate(data.project?.endDate);
+  if (!end) return 0;
+  const now = new Date();
+  now.setHours(0,0,0,0);
+  return Math.max(0, Math.ceil((end - now) / 86400000));
+}
+
+function ensureProjectData() {
+  const defaults = clone(defaultData.project);
+  if (!data.project || typeof data.project !== 'object' || Array.isArray(data.project)) data.project = defaults;
+  const savedPeriodDates = String(data.project.period || '').match(/\d{4}[.\-/]\d{1,2}[.\-/]\d{1,2}/g) || [];
+  data.project.startDate = normalizeProjectDate(data.project.startDate) || normalizeProjectDate(savedPeriodDates[0]) || defaults.startDate;
+  data.project.endDate = normalizeProjectDate(data.project.endDate) || normalizeProjectDate(savedPeriodDates[1]) || defaults.endDate;
+  data.project.period = getProjectPeriodText();
+}
+
+function syncProjectPeriodDisplay() {
+  const headerDateRange = document.getElementById('headerDateRange');
+  if (headerDateRange) headerDateRange.textContent = getProjectPeriodText();
+}
+
+function renderNav() {
+  const nav = document.getElementById('sideNav');
+  nav.innerHTML = `
+    <button class="sb-tab ${activeTab === 'summary' ? 'active' : ''}" onclick="switchTab('summary')">
+      <span class="sb-tab-main">전체 TF요약</span>
+      <span class="sb-tab-sub">진행현황 · 전체 타임테이블 · 회의록 · 조직도</span>
+    </button>
+    ${data.issues.map((issue, index) => `
+      <div class="sb-tab-row">
+        <button class="sb-tab ${activeTab === issue.id ? 'active' : ''}" onclick="switchTab('${issue.id}')">
+          <span class="sb-tab-main">핵심과제 ${issue.no}</span>
+          <span class="sb-tab-sub">${escapeHtml(issue.title)}</span>
+        </button>
+        ${index >= 3 ? `<button type="button" class="sb-tab-delete" onclick="deleteIssue('${issue.id}')">삭제</button>` : ''}
+      </div>
+    `).join('')}
+  `;
+}
+
+function ensureOrgData() {
+  const defaults = clone(defaultData.org);
+  if (!data.org || typeof data.org !== 'object' || Array.isArray(data.org)) data.org = defaults;
+  if (!('sponsor' in data.org)) data.org.sponsor = defaults.sponsor;
+  if (!('sponsorRole' in data.org)) data.org.sponsorRole = defaults.sponsorRole;
+  if (!('manager' in data.org)) data.org.manager = defaults.manager;
+  if (!('managerRole' in data.org)) data.org.managerRole = defaults.managerRole;
+  if (!Array.isArray(data.org.teams)) data.org.teams = clone(defaults.teams);
+
+  data.org.teams = data.org.teams.map((member, index) => ({
+    id: member?.id || `org-member-${Date.now()}-${index + 1}`,
+    name: String(member?.name ?? ''),
+    role: String(member?.role ?? '')
+  }));
+}
+
+function renderAll() {
+  ensureProjectData();
+  ensureOrgData();
+  normalizeAllIssues();
+  ensureIssueViews();
+  renderNav();
+  syncProjectPeriodDisplay();
+  renderSummary();
+  data.issues.forEach(issue => renderIssue(issue));
+  document.body.classList.toggle('dark', data.theme === 'dark');
+  syncTopMenu();
+  requestAnimationFrame(renderCharts);
+}
+
+function ensureIssueViews() {
+  const main = document.querySelector('.main-scroll');
+  if (!main) return;
+  (data.issues || []).forEach(issue => {
+    const id = `view-${issue.id}`;
+    if (!document.getElementById(id)) {
+      const section = document.createElement('section');
+      section.className = 'view';
+      section.id = id;
+      main.appendChild(section);
+    }
+  });
+}
+
+function syncTopMenu() {
+  const editBtn = document.getElementById('topEditBtn');
+  if (!editBtn) return;
+  editBtn.textContent = editMode ? '편집 모드 끄기' : '편집 모드 켜기';
+  editBtn.classList.toggle('active', editMode);
+  editBtn.disabled = !currentUser;
+}
+
+function renderSummary() {
+  const overall = calcOverall();
+  const el = document.getElementById('view-summary');
+  el.innerHTML = `
+    <div class="page">
+      <div class="kpi-strip">
+        <div class="kpi-card" style="--kpi:#12365a;">
+          <div class="kpi-label">전체 진척도</div>
+          <div class="kpi-value">${overall.pct}%</div>
+          <div class="kpi-sub">전체 실행과제 기준</div>
+        </div>
+        <div class="kpi-card" style="--kpi:#1d4ed8;">
+          <div class="kpi-label">프로젝트 기간</div>
+          <div class="kpi-value">${projectDurationDays()}<span style="font-size:15px;">일</span></div>
+          <div class="kpi-sub">${escapeHtml(getProjectPeriodText())}</div>
+        </div>
+        <div class="kpi-card" style="--kpi:#0f9f6e;">
+          <div class="kpi-label">잔여 기간</div>
+          <div class="kpi-value">${daysLeft()}<span style="font-size:15px;">일</span></div>
+          <div class="kpi-sub">오늘 기준</div>
+        </div>
+        <div class="kpi-card" style="--kpi:#8b1e2d;">
+          <div class="kpi-label">실행과제</div>
+          <div class="kpi-value">${overall.done}<span style="font-size:15px;"> / ${overall.total}</span></div>
+          <div class="kpi-sub">완료 / 전체</div>
+        </div>
+      </div>
+
+      <div class="section-head">
+        <div class="section-title"><span class="sec-num">1</span>TF 개요 · 배경</div>
+      </div>
+      <div class="overview-grid">
+        <div class="card card-pad">
+          <table class="meta-table">
+            <tr><td>프로젝트명</td><td><strong>${escapeHtml(data.project.name)}</strong></td></tr>
+            <tr>
+              <td>기간</td>
+              <td>
+                <strong>${escapeHtml(getProjectPeriodText())}</strong>
+                ${editMode ? `
+                  <div class="project-deadline-editor no-print">
+                    <label for="project-end-date">마감일</label>
+                    <input id="project-end-date" type="date" value="${escapeAttr(data.project.endDate || '')}" onchange="updateProjectDeadline(this.value)" />
+                  </div>
+                ` : ''}
+              </td>
+            </tr>
+            <tr><td>TF 목표</td><td>${escapeHtml(data.project.goal)}</td></tr>
+            <tr><td>배경 (공장)</td><td>${escapeHtml(data.project.backgroundFactory)}</td></tr>
+            <tr><td>배경 (물류)</td><td>${escapeHtml(data.project.backgroundLogistics)}</td></tr>
+          </table>
+        </div>
+        <div class="card card-pad">
+          <div class="subtle" style="font-weight:950;margin-bottom:13px;">주요 활동</div>
+          <div class="activity-list">
+            <div class="activity-item"><div class="activity-n">1</div><div class="activity-text">인천공장 <strong>Bulk Bin 증설 모델</strong> 확정</div></div>
+            <div class="activity-item"><div class="activity-n">2</div><div class="activity-text"><strong>Bulk Station 구축 영업소</strong> 선정 및 운영 방안 확정</div></div>
+            <div class="activity-item"><div class="activity-n">3</div><div class="activity-text">Capa 증가 및 절감 비용 산출 후 <strong>경제성 검토</strong></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-head">
+        <div class="section-title"><span class="sec-num">2</span>핵심과제별 진행 현황</div>
+        <span class="subtle">상세 화면으로 이동 가능</span>
+      </div>
+      <div class="portfolio-list">
+        ${data.issues.map(issue => portfolioRow(issue)).join('')}
+      </div>
+
+      <div class="section-head">
+        <div class="section-title"><span class="sec-num">3</span>전체 과제 Time table</div>
+        <span class="subtle">각 실행과제의 일정만 통합 표시</span>
+      </div>
+      <div class="card card-pad">
+        ${buildTimeline(data.issues.flatMap(issue => issue.tasks.map(task => ({ ...task, issueTitle: issue.title, color: issue.color }))))}
+      </div>
+
+      <div class="section-head">
+        <div class="section-title"><span class="sec-num">4</span>일정 · 현황 차트</div>
+      </div>
+      <div class="chart-grid">
+        <div class="card card-pad">
+          <div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:12px;">
+            <strong>전체 진척도</strong>
+            <span class="subtle">완료 / 잔여</span>
+          </div>
+          <div class="chart-container">
+            <div id="overallDonutFallback" class="donut-css" style="--pct:${overall.pct};">
+              <div class="donut-label"><strong>${overall.pct}%</strong><span>${overall.done} / ${overall.total} 완료</span></div>
+            </div>
+            <canvas id="overallDonut" style="display:none;"></canvas>
+          </div>
+        </div>
+        <div class="card card-pad">
+          <div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:12px;">
+            <strong>핵심과제별 진척도 비교</strong>
+            <span class="subtle">완료율 막대 비교</span>
+          </div>
+          ${buildComparisonTable()}
+        </div>
+      </div>
+
+      <div class="section-head">
+        <div class="section-title"><span class="sec-num">5</span>회의록</div>
+        <span class="subtle">통합 회의록 저장</span>
+      </div>
+      ${buildLibraryPanel('summary')}
+
+      <div class="section-head">
+        <div class="section-title"><span class="sec-num">6</span>TF 조직 및 R&amp;R</div>
+      </div>
+      ${buildOrgChart()}
+    </div>
+  `;
+}
+
+function portfolioRow(issue) {
+  const stat = calcIssue(issue);
+  return `
+    <div class="portfolio-item" onclick="switchTab('${issue.id}')">
+      <div>
+        <div class="portfolio-title">${escapeHtml(issue.title)}</div>
+        <div class="portfolio-meta">Sponsor: ${escapeHtml(issue.sponsor)} · Supporter: ${escapeHtml(issue.supporter)} · Team leader: ${escapeHtml(issue.leader)}</div>
+      </div>
+      <div class="portfolio-count">과제 ${stat.total}개</div>
+      <div class="progress-wrap">
+        <div class="track"><div class="fill" style="width:${stat.pct}%;background:${issue.color};"></div></div>
+        <div class="pct">${stat.pct}%</div>
+      </div>
+      <div><span class="pill normal">정상</span></div>
+    </div>
+  `;
+}
+
+function buildComparisonTable() {
+  return `
+    <table class="comparison-table">
+      <thead>
+        <tr><th>핵심과제</th><th>Team leader</th><th>과제</th><th>진행</th><th>완료율</th></tr>
+      </thead>
+      <tbody>
+        ${data.issues.map(issue => {
+          const stat = calcIssue(issue);
+          return `
+            <tr>
+              <td><strong>${escapeHtml(issue.title)}</strong></td>
+              <td>${escapeHtml(issue.leader)}</td>
+              <td>${stat.total}개</td>
+              <td>
+                <div class="progress-wrap">
+                  <div class="track"><div class="fill" style="width:${stat.pct}%;background:${issue.color};"></div></div>
+                  <div class="pct">${stat.pct}%</div>
+                </div>
+              </td>
+              <td>${stat.done}/${stat.total}</td>
+            </tr>
+          `;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+function buildOrgChart() {
+  ensureOrgData();
+  const org = data.org;
+  return `
+    <div class="card org-wrap">
+      <div class="org-headline">
+        <h3>조직도</h3>
+        ${editMode
+          ? `<button type="button" class="btn-soft btn-small no-print" onclick="addOrgMember()">+ 팀원 추가</button>`
+          : `<span class="subtle">팀원</span>`}
+      </div>
+      <div class="org-grid">
+        <div class="org-col">
+          <div class="org-card">
+            <div class="org-card-label">Sponsor</div>
+            ${editMode ? `
+              <input aria-label="Sponsor 이름" class="org-edit-input" value="${escapeAttr(org.sponsor)}" onchange="updateOrgField('sponsor', this.value)" />
+              <input aria-label="Sponsor 역할" class="org-edit-role" value="${escapeAttr(org.sponsorRole)}" onchange="updateOrgField('sponsorRole', this.value)" />
+            ` : `
+              <div class="org-name">${escapeHtml(org.sponsor)}</div>
+              <div class="org-role">${escapeHtml(org.sponsorRole)}</div>
+            `}
+          </div>
+        </div>
+        <div class="org-col">
+          <div class="org-card">
+            <div class="org-card-label">Project Manager</div>
+            ${editMode ? `
+              <input aria-label="Project Manager 이름" class="org-edit-input" value="${escapeAttr(org.manager)}" onchange="updateOrgField('manager', this.value)" />
+              <input aria-label="Project Manager 역할" class="org-edit-role" value="${escapeAttr(org.managerRole)}" onchange="updateOrgField('managerRole', this.value)" />
+            ` : `
+              <div class="org-name">${escapeHtml(org.manager)}</div>
+              <div class="org-role">${escapeHtml(org.managerRole)}</div>
+            `}
+          </div>
+        </div>
+        <div class="org-col">
+          <div class="org-member-list">
+            <div class="org-member-head">팀원</div>
+            ${org.teams.length ? org.teams.map(member => `
+              <div class="org-member">
+                ${editMode ? `
+                  <div class="org-member-edit-grid">
+                    <input aria-label="팀원 이름" value="${escapeAttr(member.name)}" onchange="updateOrgMember('${member.id}', 'name', this.value)" />
+                    <input aria-label="팀원 역할" value="${escapeAttr(member.role)}" onchange="updateOrgMember('${member.id}', 'role', this.value)" />
+                    <button type="button" class="btn-danger btn-small no-print" onclick="deleteOrgMember('${member.id}')">삭제</button>
+                  </div>
+                ` : `
+                  <div class="org-member-name">${escapeHtml(member.name)}</div>
+                  <div class="org-member-role">${escapeHtml(member.role)}</div>
+                `}
+              </div>
+            `).join('') : `<div class="subtle">등록된 팀원이 없습니다.</div>`}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderIssue(issue) {
+  ensureIssueTasks(issue);
+  const stat = calcIssue(issue);
+  const el = document.getElementById(`view-${issue.id}`);
+  el.innerHTML = `
+    <div class="page">
+      <div class="detail-hero">
+        <div class="detail-head" style="background:linear-gradient(135deg, ${issue.color}, #12365a);">
+          <div class="detail-label">핵심과제 ${issue.no}</div>
+          ${editMode ? `<input class="detail-title-input" value="${escapeAttr(issue.title)}" onchange="updateIssueField('${issue.id}','title',this.value)" />` : `<div class="detail-title">${escapeHtml(issue.title)}</div>`}
+        </div>
+        <div class="detail-body">
+          <div class="progress-wrap">
+            <div class="track"><div class="fill" style="width:${stat.pct}%;background:${issue.color};"></div></div>
+            <div class="pct">${stat.pct}%</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tabs no-print">
+        <button class="tab active" data-tab="${issue.id}-tasks" onclick="showIssuePanel('${issue.id}','tasks')">상세 과제</button>
+        <button class="tab" data-tab="${issue.id}-timeline" onclick="showIssuePanel('${issue.id}','timeline')">Time table</button>
+        <button class="tab" data-tab="${issue.id}-library" onclick="showIssuePanel('${issue.id}','library')">회의록</button>
+      </div>
+
+      <div id="${issue.id}-panel-tasks" class="issue-panel">
+        <div class="card card-pad">
+          <div class="edit-toolbar no-print">
+            <div>
+              <div class="section-title" style="font-size:16px;">상세 과제 내역</div>
+              <div class="subtle">편집모드를 켜면 과제 수정, 하위과제 추가, 삭제가 가능합니다.</div>
+            </div>
+            <div class="edit-actions">
+              ${editMode ? `<button class="btn-soft" onclick="addTask('${issue.id}', null)">+ 메인 과제</button>` : ''}
+            </div>
+          </div>
+          <div class="timeline-wrap">
+            <table class="wbs-table">
+              <thead>
+                <tr>
+                  <th class="wbs-name">과제명</th>
+                  <th class="wbs-text">목표</th>
+                  <th class="wbs-text">산출물</th>
+                  <th class="wbs-small">담당</th>
+                  <th class="wbs-date">시작일</th>
+                  <th class="wbs-date">종료일</th>
+                  <th class="wbs-progress">진행률</th>
+                  <th class="wbs-status">상태</th>
+                  <th class="wbs-text">지연사유</th>
+                  <th class="wbs-small">제출</th>
+                  <th class="wbs-attach">첨부</th>
+                  ${editMode ? '<th class="wbs-actions no-print">작업</th>' : ''}
+                </tr>
+              </thead>
+              <tbody>
+                ${renderTaskRows(issue)}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="${issue.id}-panel-timeline" class="issue-panel" style="display:none;">
+        <div class="card card-pad">${buildTimeline(issue.tasks.map(task => ({ ...task, issueTitle: issue.title, color: issue.color })))}</div>
+      </div>
+
+      <div id="${issue.id}-panel-library" class="issue-panel" style="display:none;">
+        ${buildLibraryPanel(issue.id)}
+      </div>
+    </div>
+  `;
+}
+function renderTaskRows(issue) {
+  ensureIssueTasks(issue);
+  let html = '';
+  const renderNode = parentId => {
+    issue.tasks.filter(t => (t.parentId || null) === parentId).forEach(task => {
+      const hasChildren = issue.tasks.some(child => child.parentId === task.id);
+      html += taskRow(issue, task, hasChildren);
+      renderNode(task.id);
+    });
+  };
+  renderNode(null);
+  return html || '<tr><td colspan="12" class="empty">등록된 상세 과제가 없습니다.</td></tr>';
+}
+
+function taskRow(issue, task, hasChildren = false) {
+  const level = Math.min(Number(task.level || 1), 4);
+  const status = task.status || 'none';
+  return `
+    <tr class="${level === 1 ? 'lv1' : ''}">
+      <td class="wbs-name indent-${level}">
+        ${editMode ? `<input value="${escapeAttr(task.name || '')}" onchange="updateTaskField('${issue.id}','${task.id}','name',this.value)" />` : escapeHtml(task.name || '-')}
+      </td>
+      <td class="wbs-text">
+        ${editMode ? `<textarea onchange="updateTaskField('${issue.id}','${task.id}','goal',this.value)">${escapeHtml(task.goal || '')}</textarea>` : escapeHtml(task.goal || '-')}
+      </td>
+      <td class="wbs-text">
+        ${editMode ? `<input value="${escapeAttr(task.output || '')}" onchange="updateTaskField('${issue.id}','${task.id}','output',this.value)" />` : escapeHtml(task.output || '-')}
+      </td>
+      <td class="wbs-small">
+        ${editMode ? `<input value="${escapeAttr(task.owner || '')}" onchange="updateTaskField('${issue.id}','${task.id}','owner',this.value)" />` : escapeHtml(task.owner || '-')}
+      </td>
+      <td class="nowrap-cell wbs-date">
+        ${editMode ? `<input type="date" value="${escapeAttr(task.start || '')}" onchange="updateTaskField('${issue.id}','${task.id}','start',this.value)" />` : escapeHtml(task.start || '-')}
+      </td>
+      <td class="nowrap-cell wbs-date">
+        ${editMode ? `<input type="date" value="${escapeAttr(task.end || '')}" onchange="updateTaskField('${issue.id}','${task.id}','end',this.value)" />` : escapeHtml(task.end || '-')}
+      </td>
+      <td class="wbs-progress">
+        ${editMode && !hasChildren ? `<input type="number" min="0" max="100" value="${Number(task.progress || 0)}" onchange="updateTaskField('${issue.id}','${task.id}','progress',this.value)" />` : `<strong>${Number(task.progress || 0)}%</strong>`}
+      </td>
+      <td class="wbs-status">
+        ${editMode && !hasChildren ? `<select onchange="updateTaskField('${issue.id}','${task.id}','status',this.value)">${Object.keys(STATUS_LABELS).map(key => `<option value="${key}" ${status===key?'selected':''}>${STATUS_LABELS[key]}</option>`).join('')}</select>` : `<span class="pill ${STATUS_CLASS[status] || 'hold'}">${STATUS_LABELS[status] || '대기'}</span>`}
+      </td>
+      <td class="wbs-text">
+        ${editMode && !hasChildren ? `<textarea onchange="updateTaskField('${issue.id}','${task.id}','delayReason',this.value)">${escapeHtml(task.delayReason || '')}</textarea>` : escapeHtml(task.delayReason || '-')}
+      </td>
+      <td class="wbs-small">
+        ${editMode ? `<select onchange="updateTaskField('${issue.id}','${task.id}','submitStatus',this.value)">${['미제출','제출'].map(value => `<option value="${value}" ${(task.submitStatus || '미제출') === value ? 'selected' : ''}>${value}</option>`).join('')}</select>` : escapeHtml(task.submitStatus || '미제출')}
+      </td>
+      <td class="wbs-attach">
+        ${renderTaskAttachment(issue.id, task)}
+      </td>
+      ${editMode ? `<td class="wbs-actions no-print"><div class="library-actions">${level < 4 ? `<button class="btn-soft btn-small" onclick="addTask('${issue.id}','${task.id}')">+ 하위</button>` : ''}<button class="btn-danger btn-small" onclick="deleteTask('${issue.id}','${task.id}')">삭제</button></div></td>` : ''}
+    </tr>
+  `;
+}
+
+function renderTaskAttachment(issueId, task) {
+  const file = task.attachment || null;
+  const fileHtml = file
+    ? `<button type="button" class="link-btn task-file-name" onclick="downloadTaskAttachment('${issueId}','${task.id}')">${escapeHtml(file.name || '첨부파일')}</button><div class="task-file-meta">${escapeHtml(formatFileSize(file.size || 0))}</div>`
+    : '<span class="subtle">-</span>';
+  if (!editMode) return fileHtml;
+  return `
+    <div>
+      ${fileHtml}
+      <input class="task-file-input" type="file" accept="${TASK_ATTACHMENT_ACCEPT}" onchange="handleTaskAttachment('${issueId}','${task.id}',this.files[0]); this.value='';" />
+      ${file ? `<button type="button" class="btn-danger btn-small" onclick="removeTaskAttachment('${issueId}','${task.id}')">삭제</button>` : ''}
+    </div>
+  `;
+}
+
+function formatFileSize(bytes) {
+  const value = Number(bytes || 0);
+  if (!value) return '0 KB';
+  if (value < 1024 * 1024) return `${Math.ceil(value / 1024)} KB`;
+  return `${(value / 1024 / 1024).toFixed(1)} MB`;
+}
+function buildTimeline(tasks) {
+  const rows = tasks || [];
+  if (!rows.length) return '<div class="empty">표시할 일정이 없습니다.</div>';
+
+  const datedRows = rows.filter(row => parseTaskDate(row.start) && parseTaskDate(row.end));
+  if (!datedRows.length) return '<div class="empty">시작일과 종료일이 입력된 상세 과제가 없어 Time table을 표시하지 않습니다.</div>';
+
+  const weeks = [];
+  const allDates = datedRows.flatMap(row => [parseTaskDate(row.start), parseTaskDate(row.end)]);
+  let cur = new Date(Math.min(...allDates.map(d => d.getTime())));
+  while (cur.getDay() !== 1) cur.setDate(cur.getDate() - 1);
+  const end = new Date(Math.max(...allDates.map(d => d.getTime())));
+  while (cur <= end) {
+    weeks.push(new Date(cur));
+    cur.setDate(cur.getDate() + 7);
+  }
+
+  const monthHeaders = [];
+  let lastMonth = null;
+  let span = 0;
+  weeks.forEach(w => {
+    const m = w.getMonth();
+    if (lastMonth === null) {
+      lastMonth = m;
+      span = 1;
+    } else if (m === lastMonth) {
+      span++;
+    } else {
+      monthHeaders.push({ month: lastMonth + 1, span });
+      lastMonth = m;
+      span = 1;
+    }
+  });
+  monthHeaders.push({ month: lastMonth + 1, span });
+
+  return `
+    <div class="timeline-wrap">
+      <table class="timeline-table">
+        <thead>
+          <tr>
+            <th class="tl-label">실행과제</th>
+            ${monthHeaders.map(m => `<th colspan="${m.span}">${m.month}월</th>`).join('')}
+          </tr>
+          <tr>
+            <th class="tl-label"></th>
+            ${weeks.map(w => `<th>${w.getMonth()+1}/${w.getDate()}</th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          ${datedRows.map(row => {
+            const start = parseTaskDate(row.start);
+            const finish = parseTaskDate(row.end);
+            return `
+              <tr>
+                <td class="tl-label">
+                  ${escapeHtml(row.name)}
+                  <div class="file-meta">${escapeHtml(row.issueTitle || '')} · ${escapeHtml(row.owner || '-')}</div>
+                </td>
+                ${weeks.map(w => {
+                  const wEnd = new Date(w);
+                  wEnd.setDate(wEnd.getDate() + 6);
+                  const active = w <= finish && wEnd >= start;
+                  const cls = row.color === '#0f9f6e' ? 'tl-c2' : row.color === '#8b1e2d' ? 'tl-c3' : 'tl-c1';
+                  return `<td class="tl-cell">${active ? `<div class="tl-bar ${cls}"></div>` : ''}</td>`;
+                }).join('')}
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function buildLibraryPanel(scope) {
+  const isSummary = scope === 'summary';
+  const issue = isSummary ? null : issueById(scope);
+  const files = isSummary ? data.library : (issue?.library || []);
+  const prefix = isSummary ? 'summary' : scope;
+  return `
+    <div class="card card-pad">
+      <div class="library-toolbar no-print">
+        <div>
+          <label>구분</label>
+          <select id="${prefix}-lib-category">
+            <option value="Biweekly">Biweekly</option>
+            <option value="Monthly">Monthly</option>
+            <option value="기타">기타</option>
+          </select>
+        </div>
+        <div>
+          <label>회의일</label>
+          <input id="${prefix}-lib-date" type="date" value="${todayStr()}" />
+        </div>
+        <div>
+          <label>제목</label>
+          <input id="${prefix}-lib-title" placeholder="예: 7월 1차 Biweekly 회의록" />
+        </div>
+        <button class="btn-primary" onclick="saveLibraryPost('${scope}')">회의록 저장</button>
+      </div>
+      <textarea id="${prefix}-lib-content" class="library-content no-print" placeholder="회의록 내용을 입력하세요.&#10;&#10;1. 참석자&#10;2. 주요 논의사항&#10;3. 결정사항&#10;4. 후속조치"></textarea>
+      <div class="timeline-wrap" style="margin-top:14px;">
+        <table class="library-table">
+          <thead>
+            <tr><th>회의록</th><th>구분</th><th>회의일</th><th>등록일</th><th class="no-print">작업</th></tr>
+          </thead>
+          <tbody>
+            ${files.map(file => `
+              <tr>
+                <td>
+                  <div class="file-title">${escapeHtml(file.title)}</div>
+                  <div class="file-meta">${escapeHtml(file.content).slice(0, 120)}${file.content.length > 120 ? '...' : ''}</div>
+                </td>
+                <td>${escapeHtml(file.category)}</td>
+                <td>${escapeHtml(file.meetingDate)}</td>
+                <td>${escapeHtml(file.createdAt)}</td>
+                <td class="no-print">
+                  <div class="library-actions">
+                    <button class="btn-soft btn-small" onclick="viewLibraryPost('${scope}','${file.id}')">보기</button>
+                    <button class="btn-soft btn-small" onclick="editLibraryPost('${scope}','${file.id}')">수정</button>
+                    <button class="btn-danger btn-small" onclick="deleteLibraryPost('${scope}','${file.id}')">삭제</button>
+                  </div>
+                </td>
+              </tr>
+            `).join('') || '<tr><td colspan="5" class="empty">아직 등록된 회의록이 없습니다.</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function renderCharts() {
+  const canvas = document.getElementById('overallDonut');
+  if (!canvas || typeof Chart === 'undefined') return;
+  const fallback = document.getElementById('overallDonutFallback');
+  if (fallback) fallback.style.display = 'none';
+  canvas.style.display = 'block';
+  const overall = calcOverall();
+  if (donutChart) donutChart.destroy();
+  donutChart = new Chart(canvas, {
+    type: 'doughnut',
+    data: {
+      labels: ['완료', '잔여'],
+      datasets: [{
+        data: [overall.done, Math.max(0, overall.total - overall.done)],
+        backgroundColor: ['#8b1e2d', '#d8dee9'],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '70%',
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 14, font: { weight: 'bold' } } } }
+    }
+  });
+}
+
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
+  const view = document.getElementById(`view-${tab}`);
+  if (view) view.classList.add('active');
+  renderNav();
+  if (tab === 'summary') requestAnimationFrame(renderCharts);
+}
+
+function showIssuePanel(issueId, panel) {
+  document.querySelectorAll(`#view-${issueId} .issue-panel`).forEach(el => el.style.display = 'none');
+  document.getElementById(`${issueId}-panel-${panel}`).style.display = '';
+  document.querySelectorAll(`#view-${issueId} .tab`).forEach(btn => btn.classList.toggle('active', btn.dataset.tab === `${issueId}-${panel}`));
+}
+
+function ensureIssueTasks(issue) {
+  if (!issue || !Array.isArray(issue.tasks)) return;
+  issue.tasks.forEach((task, idx) => {
+    if (!task.id) task.id = `${issue.no || 'task'}-${idx + 1}`;
+    if (!('parentId' in task)) task.parentId = null;
+    if (!task.level) task.level = task.parentId ? 2 : 1;
+    if (!('status' in task)) task.status = 'none';
+    if (!('start' in task)) task.start = '';
+    if (!('end' in task)) task.end = '';
+    if (!('owner' in task)) task.owner = issue.leader || '';
+    if (!('goal' in task)) task.goal = '';
+    if (!('output' in task)) task.output = '';
+    if (!('progress' in task)) task.progress = task.status === 'done' ? 100 : task.status === 'wip' ? 50 : 0;
+    if (!('delayReason' in task)) task.delayReason = '';
+    if (!('submitStatus' in task)) task.submitStatus = '미제출';
+    if (!('attachment' in task)) task.attachment = null;
+    normalizeTaskCompletion(task, false);
+  });
+  recalcIssueHierarchy(issue);
+}
+
+function normalizeTaskCompletion(task, showMessage = true) {
+  const hasOutput = String(task.output || '').trim().length > 0;
+  if (!hasOutput && (Number(task.progress || 0) >= 100 || task.status === 'done')) {
+    task.progress = 99;
+    task.status = 'wip';
+    if (showMessage) alert('산출물을 입력해야 진행률을 100%로 변경할 수 있습니다.');
+    return false;
+  }
+  if (hasOutput && Number(task.progress || 0) >= 100) {
+    task.progress = 100;
+    task.status = 'done';
+  }
+  return true;
+}
+
+function recalcIssueHierarchy(issue) {
+  const levels = [...new Set((issue.tasks || []).map(task => Number(task.level || 1)))].sort((a, b) => b - a);
+  levels.forEach(level => {
+    issue.tasks.filter(task => Number(task.level || 1) === level - 1).forEach(parent => {
+      const children = issue.tasks.filter(child => child.parentId === parent.id);
+      if (!children.length) return;
+      const avg = Math.round(children.reduce((sum, child) => sum + Number(child.progress || 0), 0) / children.length);
+      parent.progress = avg;
+      parent.status = children.every(child => isTaskComplete(child)) ? 'done' : avg > 0 ? 'wip' : 'none';
+    });
+  });
+}
+
+function normalizeAllIssues() {
+  (data.issues || []).forEach(ensureIssueTasks);
+}
+
+function toggleEditMode() {
+  if (!editMode && !requireEditPermission()) return;
+  editMode = !editMode;
+  renderAll();
+  switchTab(activeTab);
+  syncTopMenu();
+}
+
+function openSettings() {
+  alert('설정에서는 현재 브라우저 저장 방식으로 데이터가 유지됩니다. 초기화가 필요하면 별도로 요청해 주세요.');
+}
+
+function downloadPdf() {
+  window.print();
+}
+
+function updateIssueField(issueId, field, value) {
+  const issue = issueById(issueId);
+  if (!issue) return;
+  issue[field] = value.trim();
+  saveAll(false);
+  renderAll();
+  switchTab(issueId);
+}
+
+function updateProjectDeadline(value) {
+  ensureProjectData();
+  const nextEndDate = normalizeProjectDate(value);
+  if (!nextEndDate) {
+    alert('마감일을 올바른 날짜로 입력해 주세요.');
+    return;
+  }
+  const start = parseTaskDate(data.project.startDate);
+  const end = parseTaskDate(nextEndDate);
+  if (start && end < start) {
+    alert('마감일은 프로젝트 시작일보다 빠를 수 없습니다.');
+    return;
+  }
+  data.project.endDate = nextEndDate;
+  data.project.period = getProjectPeriodText();
+  saveAll(false);
+  renderAll();
+  switchTab('summary');
+}
+
+function updateOrgField(field, value) {
+  ensureOrgData();
+  data.org[field] = String(value ?? '').trim();
+  saveAll(false);
+  renderAll();
+  switchTab('summary');
+}
+
+function updateOrgMember(memberId, field, value) {
+  ensureOrgData();
+  const member = data.org.teams.find(item => item.id === memberId);
+  if (!member) return;
+  member[field] = String(value ?? '').trim();
+  saveAll(false);
+  renderAll();
+  switchTab('summary');
+}
+
+function addOrgMember() {
+  ensureOrgData();
+  data.org.teams.push({
+    id: `org-member-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    name: '새 팀원',
+    role: '역할 입력'
+  });
+  saveAll(false);
+  renderAll();
+  switchTab('summary');
+}
+
+function deleteOrgMember(memberId) {
+  ensureOrgData();
+  const member = data.org.teams.find(item => item.id === memberId);
+  if (!member) return;
+  if (!confirm(`${member.name || '선택한 팀원'}을(를) 조직도에서 삭제하시겠습니까?`)) return;
+  data.org.teams = data.org.teams.filter(item => item.id !== memberId);
+  saveAll(false);
+  renderAll();
+  switchTab('summary');
+}
+
+function deleteIssue(issueId) {
+  const index = data.issues.findIndex(issue => issue.id === issueId);
+  if (index < 0) return;
+  if (index < 3) {
+    alert('기본 핵심과제 1~3은 삭제할 수 없습니다.');
+    return;
+  }
+  const issue = data.issues[index];
+  if (!confirm(`핵심과제 ${issue.no}과(와) 하위 상세 과제·회의록 자료를 모두 삭제하시겠습니까?`)) return;
+
+  data.issues.splice(index, 1);
+  data.issues.forEach((item, itemIndex) => {
+    item.no = String(itemIndex + 1).padStart(2, '0');
+  });
+
+  document.getElementById(`view-${issueId}`)?.remove();
+  saveAll(false);
+  activeTab = 'summary';
+  renderAll();
+  switchTab('summary');
+}
+
+function addIssue() {
+  const nextNo = String((data.issues || []).length + 1).padStart(2, '0');
+  const id = `issue${Date.now()}`;
+  const colors = ['#1d4ed8', '#0f9f6e', '#8b1e2d', '#d97706', '#6b7280'];
+  const issue = {
+    id,
+    no: nextNo,
+    color: colors[(data.issues || []).length % colors.length],
+    title: `신규 핵심과제 ${nextNo}`,
+    sponsor: '',
+    supporter: '',
+    leader: '',
+    tasks: [],
+    library: []
+  };
+  data.issues.push(issue);
+  saveAll(false);
+  editMode = true;
+  renderAll();
+  switchTab(id);
+}
+
+function cycleTaskStatus(issueId, taskId) {
+  const issue = issueById(issueId);
+  const task = issue?.tasks.find(t => t.id === taskId);
+  if (!task) return;
+  const order = ['none', 'wip', 'done', 'hold'];
+  task.status = order[(order.indexOf(task.status) + 1) % order.length];
+  saveAll(false);
+  renderAll();
+  switchTab(issueId);
+}
+
+function addTask(issueId, parentId = null) {
+  const issue = issueById(issueId);
+  if (!issue) return;
+  ensureIssueTasks(issue);
+  const parent = parentId ? issue.tasks.find(t => t.id === parentId) : null;
+  const level = parent ? Number(parent.level || 1) + 1 : 1;
+  if (level > 4) return;
+  issue.tasks.push({
+    id: `${issue.no}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    parentId: parentId || null,
+    level,
+    name: level === 1 ? '새 메인 과제' : '새 하위 과제',
+    goal: '',
+    output: '',
+    owner: issue.leader || '',
+    start: '',
+    end: '',
+    progress: 0,
+    status: 'none',
+    delayReason: '',
+    submitStatus: '미제출',
+    attachment: null
+  });
+  saveAll(false);
+  renderAll();
+  switchTab(issueId);
+}
+
+function updateTaskField(issueId, taskId, field, value) {
+  const issue = issueById(issueId);
+  const task = issue?.tasks.find(t => t.id === taskId);
+  if (!task) return;
+  if (field === 'progress') {
+    const next = Math.max(0, Math.min(100, Number(value || 0)));
+    task.progress = next;
+    if (next >= 100) task.status = 'done';
+    else if (next > 0 && task.status === 'none') task.status = 'wip';
+    normalizeTaskCompletion(task);
+  } else {
+    task[field] = value;
+    if (field === 'status') {
+      if (value === 'done') task.progress = 100;
+      if (value === 'none' && Number(task.progress || 0) > 0) task.progress = 0;
+    }
+    if (field === 'output' || field === 'status') normalizeTaskCompletion(task);
+  }
+  saveAll(false);
+  renderAll();
+  switchTab(issueId);
+}
+
+function handleTaskAttachment(issueId, taskId, file) {
+  const issue = issueById(issueId);
+  const task = issue?.tasks.find(t => t.id === taskId);
+  if (!task || !file) return;
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  if (!TASK_ATTACHMENT_EXTS.includes(ext)) {
+    alert('첨부 가능 형식은 Word, HWP, Excel, PPT 파일입니다.');
+    return;
+  }
+  if (file.size > TASK_ATTACHMENT_MAX_SIZE) {
+    alert('첨부파일은 8MB 이하만 저장할 수 있습니다.');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    task.attachment = {
+      name: file.name,
+      type: file.type || 'application/octet-stream',
+      size: file.size,
+      dataUrl: reader.result,
+      uploadedAt: todayStr()
+    };
+    saveAll(false);
+    renderAll();
+    switchTab(issueId);
+  };
+  reader.onerror = () => alert('파일을 읽는 중 오류가 발생했습니다.');
+  reader.readAsDataURL(file);
+}
+
+function removeTaskAttachment(issueId, taskId) {
+  const issue = issueById(issueId);
+  const task = issue?.tasks.find(t => t.id === taskId);
+  if (!task) return;
+  if (!confirm('첨부파일을 삭제하시겠습니까?')) return;
+  task.attachment = null;
+  saveAll(false);
+  renderAll();
+  switchTab(issueId);
+}
+
+function downloadTaskAttachment(issueId, taskId) {
+  const issue = issueById(issueId);
+  const task = issue?.tasks.find(t => t.id === taskId);
+  const file = task?.attachment;
+  if (!file?.dataUrl) return;
+  const a = document.createElement('a');
+  a.href = file.dataUrl;
+  a.download = file.name || 'attachment';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+function editTask(issueId, taskId) {
+  editMode = true;
+  renderAll();
+  switchTab(issueId);
+}
+
+function deleteTask(issueId, taskId) {
+  if (!confirm('선택한 과제와 하위 과제를 삭제하시겠습니까?')) return;
+  const issue = issueById(issueId);
+  if (!issue) return;
+  const del = new Set();
+  const walk = id => {
+    del.add(id);
+    issue.tasks.filter(t => t.parentId === id).forEach(child => walk(child.id));
+  };
+  walk(taskId);
+  issue.tasks = issue.tasks.filter(t => !del.has(t.id));
+  saveAll(false);
+  renderAll();
+  switchTab(issueId);
+}
+function getLibrary(scope) {
+  if (scope === 'summary') return data.library;
+  return issueById(scope)?.library || [];
+}
+
+function saveLibraryPost(scope) {
+  const prefix = scope === 'summary' ? 'summary' : scope;
+  const title = document.getElementById(`${prefix}-lib-title`)?.value.trim();
+  const content = document.getElementById(`${prefix}-lib-content`)?.value.trim();
+  if (!title) { alert('회의록 제목을 입력해 주세요.'); return; }
+  if (!content) { alert('회의록 내용을 입력해 주세요.'); return; }
+  getLibrary(scope).unshift({
+    id: `lib-${Date.now()}`,
+    category: document.getElementById(`${prefix}-lib-category`)?.value || 'Biweekly',
+    meetingDate: document.getElementById(`${prefix}-lib-date`)?.value || '',
+    title,
+    content,
+    createdAt: new Date().toLocaleString('ko-KR')
+  });
+  saveAll(false);
+  renderAll();
+  switchTab(scope === 'summary' ? 'summary' : scope);
+  if (scope !== 'summary') showIssuePanel(scope, 'library');
+}
+
+function viewLibraryPost(scope, id) {
+  const file = getLibrary(scope).find(item => item.id === id);
+  if (!file) return;
+  alert(`[${file.category}] ${file.title}\n회의일: ${file.meetingDate}\n\n${file.content}`);
+}
+
+function editLibraryPost(scope, id) {
+  const file = getLibrary(scope).find(item => item.id === id);
+  if (!file) return;
+  const title = prompt('회의록 제목', file.title);
+  if (title === null) return;
+  const content = prompt('회의록 내용', file.content);
+  if (content === null) return;
+  file.title = title.trim() || file.title;
+  file.content = content.trim() || file.content;
+  saveAll(false);
+  renderAll();
+  switchTab(scope === 'summary' ? 'summary' : scope);
+  if (scope !== 'summary') showIssuePanel(scope, 'library');
+}
+
+function deleteLibraryPost(scope, id) {
+  if (!confirm('회의록을 삭제하시겠습니까?')) return;
+  if (scope === 'summary') data.library = data.library.filter(item => item.id !== id);
+  else {
+    const issue = issueById(scope);
+    if (issue) issue.library = issue.library.filter(item => item.id !== id);
+  }
+  saveAll(false);
+  renderAll();
+  switchTab(scope === 'summary' ? 'summary' : scope);
+  if (scope !== 'summary') showIssuePanel(scope, 'library');
+}
+
+function saveAll(showMessage = true) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  saveToSupabaseQuietly();
+  if (showMessage) {
+    document.querySelectorAll('.saved-msg').forEach(el => {
+      el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 1600);
+    });
+  }
+}
+
+function isSupabaseConfigured() {
+  return Boolean(
+    window.supabase &&
+    typeof SUPABASE_URL === 'string' &&
+    SUPABASE_URL.startsWith('http') &&
+    typeof SUPABASE_PUBLISHABLE_KEY === 'string' &&
+    SUPABASE_PUBLISHABLE_KEY &&
+    !SUPABASE_PUBLISHABLE_KEY.includes('YOUR_SUPABASE_PUBLISHABLE_KEY')
+  );
+}
+
+function initSupabase() {
+  supabaseEnabled = isSupabaseConfigured();
+  if (!supabaseEnabled) return;
+  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+}
+
+async function loadFromSupabase() {
+  if (!supabaseEnabled || !supabaseClient) return false;
+  try {
+    const { data: row, error } = await supabaseClient
+      .from('app_state')
+      .select('data')
+      .eq('id', APP_STATE_ID)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!row?.data || Object.keys(row.data).length === 0) {
+      await saveToSupabaseQuietly(true);
+      return false;
+    }
+
+    data = { ...clone(defaultData), ...row.data };
+    if (!Array.isArray(data.issues) || data.issues.length < 3) data.issues = clone(defaultData.issues);
+    clearPresetTimetableDates(data);
+    ensureProjectData();
+    ensureOrgData();
+    normalizeAllIssues();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    return true;
+  } catch (err) {
+    console.error('Supabase 데이터 로드 실패', err);
+    alert('Supabase 데이터 로드에 실패했습니다. 로컬 저장 데이터를 사용합니다.');
+    return false;
+  }
+}
+
+async function saveToSupabaseQuietly(force = false) {
+  if (!supabaseEnabled || !supabaseClient) return;
+  const now = Date.now();
+  if (!force && now - lastSupabaseSaveAt < 500) return;
+  lastSupabaseSaveAt = now;
+  try {
+    const { error } = await supabaseClient
+      .from('app_state')
+      .upsert({
+        id: APP_STATE_ID,
+        data
+      });
+    if (error) throw error;
+  } catch (err) {
+    console.error('Supabase 저장 실패', err);
+  }
+}
+
+function clearPresetTimetableDates(state) {
+  const presetDates = {
+    '1-1': ['2026-06-29', '2026-07-10'],
+    '1-2': ['2026-07-08', '2026-07-24'],
+    '1-3': ['2026-07-22', '2026-08-07'],
+    '1-4': ['2026-08-05', '2026-08-21'],
+    '2-1': ['2026-06-29', '2026-07-12'],
+    '2-2': ['2026-07-10', '2026-07-28'],
+    '2-3': ['2026-07-24', '2026-08-14'],
+    '2-4': ['2026-08-10', '2026-08-28'],
+    '3-1': ['2026-06-29', '2026-07-17'],
+    '3-2': ['2026-07-15', '2026-08-05'],
+    '3-3': ['2026-08-03', '2026-08-21'],
+    '3-4': ['2026-08-17', '2026-08-31']
+  };
+  (state.issues || []).forEach(issue => {
+    (issue.tasks || []).forEach(task => {
+      const preset = presetDates[task.id];
+      if (preset && task.start === preset[0] && task.end === preset[1]) {
+        task.start = '';
+        task.end = '';
+      }
+    });
+  });
+}
+
+function loadState() {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (!saved) return;
+  try {
+    const parsed = JSON.parse(saved);
+    data = { ...clone(defaultData), ...parsed };
+    if (!Array.isArray(data.issues) || data.issues.length < 3) data.issues = clone(defaultData.issues);
+    clearPresetTimetableDates(data);
+    ensureProjectData();
+    ensureOrgData();
+    normalizeAllIssues();
+  } catch (err) {
+    console.warn('저장 데이터 복원 실패', err);
+  }
+}
+
+function resetDemoData() {
+  if (!confirm('저장된 변경사항을 초기 데이터로 복원하시겠습니까?')) return;
+  data = clone(defaultData);
+  saveAll(false);
+  renderAll();
+  switchTab('summary');
+}
+
+function toggleTheme() {
+  data.theme = data.theme === 'dark' ? 'light' : 'dark';
+  saveAll(false);
+  renderAll();
+  switchTab(activeTab);
+}
+
+window.addEventListener('DOMContentLoaded', async () => {
+  initSupabase();
+  loadState();
+  await loadFromSupabase();
+  restoreLogin();
+  renderAll();
+});
+</script>
+</body>
+</html>
