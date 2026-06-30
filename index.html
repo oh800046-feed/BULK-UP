@@ -327,15 +327,22 @@
     .tab.active { background: var(--brand); color: #fff; border-color: var(--brand); }
 
     .timeline-wrap { overflow-x: auto; padding-bottom: 8px; }
-    .timeline-table { width: 100%; min-width: 820px; border-collapse: collapse; table-layout: fixed; }
-    .timeline-table th, .timeline-table td { border: 1px solid var(--line); padding: 7px; font-size: 12px; text-align: center; }
-    .timeline-table th { background: var(--panel-alt); color: var(--text-muted); font-weight: 950; }
-    .tl-label { min-width: 230px; text-align: left !important; font-weight: 850; color: var(--text); overflow-wrap: anywhere; word-break: keep-all; }
-    .tl-cell { min-width: 48px; height: 30px; }
-    .tl-bar { height: 14px; border-radius: 999px; }
-    .tl-c1 { background: #1d4ed8; }
-    .tl-c2 { background: #0f9f6e; }
-    .tl-c3 { background: #8b1e2d; }
+    .timeline-legend { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; color: var(--text-muted); font-size: 12px; font-weight: 850; }
+    .timeline-legend span { display: inline-flex; align-items: center; gap: 5px; }
+    .timeline-legend i { width: 9px; height: 9px; border-radius: 3px; display: inline-block; }
+    .timeline-table { width: 100%; min-width: 1180px; border-collapse: collapse; table-layout: fixed; }
+    .timeline-table th, .timeline-table td { border: 1px solid var(--line); padding: 0; font-size: 12px; text-align: center; }
+    .timeline-table th { height: 28px; background: var(--panel-alt); color: var(--text-muted); font-weight: 950; }
+    .timeline-meta-1 { width: 245px; text-align: left !important; padding: 10px 9px !important; color: var(--text); font-weight: 850; overflow-wrap: anywhere; word-break: keep-all; }
+    .timeline-meta-2 { width: 92px; padding: 10px 8px !important; }
+    .timeline-meta-3 { width: 180px; text-align: left !important; padding: 10px 8px !important; overflow-wrap: anywhere; word-break: keep-all; }
+    .tl-week { width: 34px; min-width: 34px; height: 34px; background: rgba(248,250,252,.72); }
+    .tl-active { background: rgba(29,78,216,.58); }
+    .tl-active.tl-c2 { background: rgba(15,159,110,.58); }
+    .tl-active.tl-c3 { background: rgba(139,30,45,.62); }
+    .tl-active.tl-done { background: rgba(15,159,110,.7); }
+    .tl-active.tl-hold { background: rgba(107,114,128,.58); }
+    .tl-active.tl-wip { background: rgba(29,78,216,.58); }
 
     .org-wrap { padding: 20px; border-radius: 12px; }
     .org-headline { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
@@ -1328,45 +1335,26 @@ function buildTimeline(tasks) {
   const datedRows = rows.filter(row => parseTaskDate(row.start) && parseTaskDate(row.end));
   if (!datedRows.length) return '<div class="empty">시작일과 종료일이 입력된 상세 과제가 없어 Time table을 표시하지 않습니다.</div>';
 
-  const weeks = [];
-  const allDates = datedRows.flatMap(row => [parseTaskDate(row.start), parseTaskDate(row.end)]);
-  let cur = new Date(Math.min(...allDates.map(d => d.getTime())));
-  while (cur.getDay() !== 1) cur.setDate(cur.getDate() - 1);
-  const end = new Date(Math.max(...allDates.map(d => d.getTime())));
-  while (cur <= end) {
-    weeks.push(new Date(cur));
-    cur.setDate(cur.getDate() + 7);
-  }
-
-  const monthHeaders = [];
-  let lastMonth = null;
-  let span = 0;
-  weeks.forEach(w => {
-    const m = w.getMonth();
-    if (lastMonth === null) {
-      lastMonth = m;
-      span = 1;
-    } else if (m === lastMonth) {
-      span++;
-    } else {
-      monthHeaders.push({ month: lastMonth + 1, span });
-      lastMonth = m;
-      span = 1;
-    }
-  });
-  monthHeaders.push({ month: lastMonth + 1, span });
+  const weeks = generateTimelineWeeks(datedRows);
+  const monthHeaders = buildTimelineMonthHeaders(weeks);
 
   return `
+    <div class="timeline-legend">
+      <span><i style="background:#1d4ed8"></i>진행</span>
+      <span><i style="background:#0f9f6e"></i>완료</span>
+      <span><i style="background:#6b7280"></i>보류</span>
+    </div>
     <div class="timeline-wrap">
       <table class="timeline-table">
         <thead>
           <tr>
-            <th class="tl-label">실행과제</th>
+            <th class="timeline-meta-1" rowspan="2">프로젝트 / 과제</th>
+            <th class="timeline-meta-2" rowspan="2">Owner</th>
+            <th class="timeline-meta-3" rowspan="2">비고</th>
             ${monthHeaders.map(m => `<th colspan="${m.span}">${m.month}월</th>`).join('')}
           </tr>
           <tr>
-            <th class="tl-label"></th>
-            ${weeks.map(w => `<th>${w.getMonth()+1}/${w.getDate()}</th>`).join('')}
+            ${weeks.map(w => `<th>W${w.weekNo}</th>`).join('')}
           </tr>
         </thead>
         <tbody>
@@ -1375,16 +1363,18 @@ function buildTimeline(tasks) {
             const finish = parseTaskDate(row.end);
             return `
               <tr>
-                <td class="tl-label">
+                <td class="timeline-meta-1">
                   ${escapeHtml(row.name)}
                   <div class="file-meta">${escapeHtml(row.issueTitle || '')} · ${escapeHtml(row.owner || '-')}</div>
                 </td>
+                <td class="timeline-meta-2">${escapeHtml(row.owner || '-')}</td>
+                <td class="timeline-meta-3">${escapeHtml(row.output || row.goal || row.delayReason || '-')}</td>
                 ${weeks.map(w => {
-                  const wEnd = new Date(w);
-                  wEnd.setDate(wEnd.getDate() + 6);
-                  const active = w <= finish && wEnd >= start;
-                  const cls = row.color === '#0f9f6e' ? 'tl-c2' : row.color === '#8b1e2d' ? 'tl-c3' : 'tl-c1';
-                  return `<td class="tl-cell">${active ? `<div class="tl-bar ${cls}"></div>` : ''}</td>`;
+                  const active = w.start <= finish && w.end >= start;
+                  const colorCls = row.color === '#0f9f6e' ? 'tl-c2' : row.color === '#8b1e2d' ? 'tl-c3' : 'tl-c1';
+                  const statusCls = row.status === 'done' ? 'tl-done' : row.status === 'hold' ? 'tl-hold' : 'tl-wip';
+                  const title = `${row.name || ''} / ${row.start || '-'} ~ ${row.end || '-'} / ${Number(row.progress || 0)}%`;
+                  return `<td class="tl-week ${active ? `tl-active ${colorCls} ${statusCls}` : ''}" title="${escapeAttr(title)}"></td>`;
                 }).join('')}
               </tr>
             `;
@@ -1393,6 +1383,36 @@ function buildTimeline(tasks) {
       </table>
     </div>
   `;
+}
+
+function generateTimelineWeeks(rows) {
+  const allDates = rows.flatMap(row => [parseTaskDate(row.start), parseTaskDate(row.end)]).filter(Boolean);
+  const projectStart = parseTaskDate(data.project?.startDate);
+  const projectEnd = parseTaskDate(data.project?.endDate);
+  let cur = new Date(Math.min(...[...allDates, projectStart].filter(Boolean).map(d => d.getTime())));
+  const end = new Date(Math.max(...[...allDates, projectEnd].filter(Boolean).map(d => d.getTime())));
+  cur = new Date(cur.getFullYear(), cur.getMonth(), 1);
+  const weeks = [];
+  while (cur <= end) {
+    const month = cur.getMonth();
+    for (let weekNo = 1; weekNo <= 4; weekNo++) {
+      const start = new Date(cur.getFullYear(), month, (weekNo - 1) * 7 + 1);
+      const finish = weekNo === 4 ? new Date(cur.getFullYear(), month + 1, 0) : new Date(cur.getFullYear(), month, weekNo * 7);
+      if (finish >= cur && start <= end) weeks.push({ start, end: finish, month: month + 1, weekNo });
+    }
+    cur = new Date(cur.getFullYear(), month + 1, 1);
+  }
+  return weeks;
+}
+
+function buildTimelineMonthHeaders(weeks) {
+  const headers = [];
+  weeks.forEach(week => {
+    const last = headers[headers.length - 1];
+    if (last && last.month === week.month) last.span += 1;
+    else headers.push({ month: week.month, span: 1 });
+  });
+  return headers;
 }
 
 function buildLibraryPanel(scope) {
