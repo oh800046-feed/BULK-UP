@@ -815,8 +815,38 @@ function calcIssue(issue) {
   return { total, done, wip, pct };
 }
 
-function isTaskComplete(task) {
-  return task.status === 'done' && String(task.output || '').trim().length > 0;
+function isTaskComplete(task, issue = null) {
+  const hasOutput = String(task.output || '').trim().length > 0;
+  if (task.status !== 'done' || !hasOutput) return false;
+  if (!issue) return true;
+  const children = getTaskChildren(issue, task.id);
+  if (!children.length) return true;
+  return taskTreeHasAttachment(issue, task.id);
+}
+
+function getTaskChildren(issue, taskId) {
+  return (issue?.tasks || []).filter(child => child.parentId === taskId);
+}
+
+function getTaskDescendants(issue, taskId) {
+  const descendants = [];
+  const walk = id => {
+    getTaskChildren(issue, id).forEach(child => {
+      descendants.push(child);
+      walk(child.id);
+    });
+  };
+  walk(taskId);
+  return descendants;
+}
+
+function taskHasAttachment(task) {
+  return Boolean(task?.attachment?.dataUrl || task?.attachment?.storagePath || task?.attachment?.name);
+}
+
+function taskTreeHasAttachment(issue, taskId) {
+  const task = (issue?.tasks || []).find(item => item.id === taskId);
+  return [task, ...getTaskDescendants(issue, taskId)].some(taskHasAttachment);
 }
 
 function calcOverall() {
@@ -1532,17 +1562,23 @@ function ensureIssueTasks(issue) {
     if (!('delayReason' in task)) task.delayReason = '';
     if (!('submitStatus' in task)) task.submitStatus = '미제출';
     if (!('attachment' in task)) task.attachment = null;
-    normalizeTaskCompletion(task, false);
+    normalizeTaskCompletion(task, false, issue);
   });
   recalcIssueHierarchy(issue);
 }
 
-function normalizeTaskCompletion(task, showMessage = true) {
+function normalizeTaskCompletion(task, showMessage = true, issue = null) {
   const hasOutput = String(task.output || '').trim().length > 0;
   if (!hasOutput && (Number(task.progress || 0) >= 100 || task.status === 'done')) {
     task.progress = 99;
     task.status = 'wip';
     if (showMessage) alert('산출물을 입력해야 진행률을 100%로 변경할 수 있습니다.');
+    return false;
+  }
+  if (issue && !task.parentId && (Number(task.progress || 0) >= 100 || task.status === 'done') && !taskTreeHasAttachment(issue, task.id)) {
+    task.progress = 99;
+    task.status = 'wip';
+    if (showMessage) alert('메인과제는 하위 과제를 포함해 첨부파일이 최소 1개 있어야 완료 처리할 수 있습니다.');
     return false;
   }
   if (hasOutput && Number(task.progress || 0) >= 100) {
@@ -1560,7 +1596,13 @@ function recalcIssueHierarchy(issue) {
       if (!children.length) return;
       const avg = Math.round(children.reduce((sum, child) => sum + Number(child.progress || 0), 0) / children.length);
       parent.progress = avg;
-      parent.status = children.every(child => isTaskComplete(child)) ? 'done' : avg > 0 ? 'wip' : 'none';
+      const allChildrenComplete = children.every(child => {
+        const grandChildren = getTaskChildren(issue, child.id);
+        return grandChildren.length ? child.status === 'done' : isTaskComplete(child, issue);
+      });
+      const canCompleteParent = allChildrenComplete && (parent.parentId || taskTreeHasAttachment(issue, parent.id));
+      parent.status = canCompleteParent ? 'done' : avg > 0 ? 'wip' : 'none';
+      if (parent.status !== 'done' && Number(parent.progress || 0) >= 100) parent.progress = 99;
     });
   });
 }
@@ -1705,6 +1747,9 @@ function cycleTaskStatus(issueId, taskId) {
   if (!task) return;
   const order = ['none', 'wip', 'done', 'hold'];
   task.status = order[(order.indexOf(task.status) + 1) % order.length];
+  if (task.status === 'done') task.progress = 100;
+  normalizeTaskCompletion(task, true, issue);
+  recalcIssueHierarchy(issue);
   saveAll(false);
   renderAll();
   switchTab(issueId);
@@ -1747,15 +1792,16 @@ function updateTaskField(issueId, taskId, field, value) {
     task.progress = next;
     if (next >= 100) task.status = 'done';
     else if (next > 0 && task.status === 'none') task.status = 'wip';
-    normalizeTaskCompletion(task);
+    normalizeTaskCompletion(task, true, issue);
   } else {
     task[field] = value;
     if (field === 'status') {
       if (value === 'done') task.progress = 100;
       if (value === 'none' && Number(task.progress || 0) > 0) task.progress = 0;
     }
-    if (field === 'output' || field === 'status') normalizeTaskCompletion(task);
+    if (field === 'output' || field === 'status') normalizeTaskCompletion(task, true, issue);
   }
+  recalcIssueHierarchy(issue);
   saveAll(false);
   renderAll();
   switchTab(issueId);
