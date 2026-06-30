@@ -1123,7 +1123,7 @@ function buildComparisonTable() {
   return `
     <table class="comparison-table">
       <thead>
-        <tr><th>핵심과제</th><th>Team leader</th><th>과제</th><th>진행</th><th>완료율</th></tr>
+        <tr><th>핵심과제</th><th>과제</th><th>진행</th><th>완료율</th></tr>
       </thead>
       <tbody>
         ${data.issues.map(issue => {
@@ -1131,7 +1131,6 @@ function buildComparisonTable() {
           return `
             <tr>
               <td><strong>${escapeHtml(issue.title)}</strong></td>
-              <td>${escapeHtml(issue.leader)}</td>
               <td>${stat.total}개</td>
               <td>
                 <div class="progress-wrap">
